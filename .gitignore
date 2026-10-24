@@ -15,3 +15,8 @@ client.py
 .devcontainer
 .streamlit
 .vscode
+# Secrets
+.env
+
+# Docker image exports
+*.tar

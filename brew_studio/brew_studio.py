@@ -1,3 +1,5 @@
+import os
+
 import streamlit as st
 from fellow_aiden import FellowAiden
 from fellow_aiden.profile import CoffeeProfile
@@ -167,7 +169,7 @@ def generate_ai_recipe_and_explanation(USER):
     guidance = "Suggest a recipe for the following coffee. Provide your explanations below the recipe.\n"
     USER = ' '.join([guidance, USER])
     completion = st.session_state['oai'].chat.completions.create(
-        model="o1-preview",
+        model="gpt-5.6-sol",
         messages=[
             {"role": "user", "content": SYSTEM + USER},
         ]
@@ -219,13 +221,29 @@ if "selected_profile_index" not in st.session_state:
 # Sidebar
 # ------------------------------------------------------------------------------
 with st.sidebar:
+    # Defaults come from env vars (e.g. a .env file loaded by docker compose)
+    env_email = os.getenv("FELLOW_EMAIL", "")
+    env_password = os.getenv("FELLOW_PASSWORD", "")
+
     st.header("Fellow Email Address")
-    email = st.text_input(" ", placeholder="Enter your email", 
+    email = st.text_input(" ", value=env_email, placeholder="Enter your email",
                           key="email", label_visibility="collapsed")
 
     st.header("Fellow Password")
-    password = st.text_input(" ", placeholder="Enter your password", 
+    password = st.text_input(" ", value=env_password, placeholder="Enter your password",
                              type="password", key="password", label_visibility="collapsed")
+
+    # Connect automatically once per session when credentials come from env vars
+    if env_email and env_password and not st.session_state.get("auto_connect_tried"):
+        st.session_state.auto_connect_tried = True
+        try:
+            result = connect_to_coffee_brewer(env_email, env_password)
+        except Exception as e:
+            result = None
+            st.warning(f"Auto-connect failed: {e}")
+        if result is False:
+            st.warning("Incorrect email or password (from FELLOW_EMAIL / FELLOW_PASSWORD).")
+        st.session_state.brewer_settings = result or None
 
     # Connect button
     if st.button("Connect"):
@@ -271,7 +289,8 @@ with st.sidebar:
         # ---- AI BARISTA SECTION ----
         st.markdown("### AI Barista")
         st.markdown("#### OpenAI API Key")
-        openai_api_key = st.text_input(" ", placeholder="Enter your OpenAI API Key", 
+        openai_api_key = st.text_input(" ", value=os.getenv("OPENAI_API_KEY", ""),
+                                    placeholder="Enter your OpenAI API Key",
                                     type="password", key="openai_api_key", label_visibility="collapsed")
         user_coffee_request = st.text_area(
             "Describe your coffee:",

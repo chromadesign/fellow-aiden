@@ -1,10 +1,16 @@
-fellowaiden:
+services:
+  fellowaiden:
     image: my-brew-studio-build
     container_name: fellowaiden
     build:
       context: .
-      dockerfile: Dockerfile 
+      dockerfile: Dockerfile
     ports:
       - 8501:8501
+    # FELLOW_EMAIL, FELLOW_PASSWORD, OPENAI_API_KEY (see .env.example)
+    env_file:
+      - .env
     environment:
       - PORT=8501
+    volumes:
+      - ./brew_studio:/app/fellow-aiden/brew_studio
