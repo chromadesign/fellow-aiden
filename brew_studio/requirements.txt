@@ -1,0 +1,6 @@
+# Dependencies for Brew Studio on Streamlit Community Cloud.
+# fellow_aiden itself is loaded from this repo (see top of brew_studio.py).
+streamlit
+openai
+requests>=2.32.3
+pydantic>=2.10.4

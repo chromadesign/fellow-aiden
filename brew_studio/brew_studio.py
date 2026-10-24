@@ -1,4 +1,9 @@
 import os
+import sys
+
+# Prefer the fellow_aiden package from this repo over the (older) PyPI release,
+# e.g. on Streamlit Community Cloud where the repo isn't pip-installed
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import streamlit as st
 from fellow_aiden import FellowAiden
@@ -221,39 +226,49 @@ if "selected_profile_index" not in st.session_state:
 # Sidebar
 # ------------------------------------------------------------------------------
 with st.sidebar:
-    # Defaults come from env vars (e.g. a .env file loaded by docker compose)
+    # Credentials from env vars (.env in Docker, Secrets on Streamlit Cloud).
+    # They stay on the server: never pass them to a widget, or the browser gets them.
     env_email = os.getenv("FELLOW_EMAIL", "")
     env_password = os.getenv("FELLOW_PASSWORD", "")
+    use_env_credentials = bool(env_email and env_password)
 
-    st.header("Fellow Email Address")
-    email = st.text_input(" ", value=env_email, placeholder="Enter your email",
-                          key="email", label_visibility="collapsed")
-
-    st.header("Fellow Password")
-    password = st.text_input(" ", value=env_password, placeholder="Enter your password",
-                             type="password", key="password", label_visibility="collapsed")
-
-    # Connect automatically once per session when credentials come from env vars
-    if env_email and env_password and not st.session_state.get("auto_connect_tried"):
-        st.session_state.auto_connect_tried = True
+    def connect_with_env_credentials():
         try:
             result = connect_to_coffee_brewer(env_email, env_password)
         except Exception as e:
             result = None
-            st.warning(f"Auto-connect failed: {e}")
+            st.warning(f"Connection failed: {e}")
         if result is False:
-            st.warning("Incorrect email or password (from FELLOW_EMAIL / FELLOW_PASSWORD).")
+            st.warning("Stored Fellow credentials are incorrect.")
         st.session_state.brewer_settings = result or None
 
-    # Connect button
-    if st.button("Connect"):
-        if email and password:
-            result = connect_to_coffee_brewer(email, password)
-            if not result:
-                st.warning("Incorrect email or password.")
-            st.session_state.brewer_settings = result
-        else:
-            st.warning("Please enter email and password first.")
+    if use_env_credentials:
+        st.header("Fellow Account")
+        st.caption("Using stored credentials.")
+        # Connect automatically once per session
+        if not st.session_state.get("auto_connect_tried"):
+            st.session_state.auto_connect_tried = True
+            connect_with_env_credentials()
+        if not st.session_state.brewer_settings and st.button("Reconnect"):
+            connect_with_env_credentials()
+    else:
+        st.header("Fellow Email Address")
+        email = st.text_input(" ", placeholder="Enter your email",
+                              key="email", label_visibility="collapsed")
+
+        st.header("Fellow Password")
+        password = st.text_input(" ", placeholder="Enter your password",
+                                 type="password", key="password", label_visibility="collapsed")
+
+        # Connect button
+        if st.button("Connect"):
+            if email and password:
+                result = connect_to_coffee_brewer(email, password)
+                if not result:
+                    st.warning("Incorrect email or password.")
+                st.session_state.brewer_settings = result
+            else:
+                st.warning("Please enter email and password first.")
 
     st.markdown("---")
 
@@ -288,10 +303,14 @@ with st.sidebar:
 
         # ---- AI BARISTA SECTION ----
         st.markdown("### AI Barista")
-        st.markdown("#### OpenAI API Key")
-        openai_api_key = st.text_input(" ", value=os.getenv("OPENAI_API_KEY", ""),
-                                    placeholder="Enter your OpenAI API Key",
-                                    type="password", key="openai_api_key", label_visibility="collapsed")
+        # Same as above: a stored key never goes into a widget
+        openai_api_key = os.getenv("OPENAI_API_KEY", "")
+        if openai_api_key:
+            st.caption("Using stored OpenAI API key.")
+        else:
+            st.markdown("#### OpenAI API Key")
+            openai_api_key = st.text_input(" ", placeholder="Enter your OpenAI API Key",
+                                        type="password", key="openai_api_key", label_visibility="collapsed")
         user_coffee_request = st.text_area(
             "Describe your coffee:",
             placeholder="Light roasted blend of washed (Sidama, Ethiopia) and gesha (Santa Barbara, Honduras) coffees",
